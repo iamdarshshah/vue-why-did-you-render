@@ -150,6 +150,15 @@ export function enableWhyDidYouRender(
                 }
             },
         ]
+
+        // Hook into unmounted lifecycle to clean up tracking data
+        const originalUm = instance.um || []
+        instance.um = [
+            ...originalUm,
+            () => {
+                registry.cleanupComponent(componentId)
+            },
+        ]
     }
 
     // Use beforeCreate which runs earliest, and beforeMount as fallback
