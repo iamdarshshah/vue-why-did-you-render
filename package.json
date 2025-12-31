@@ -1,0 +1,82 @@
+{
+    "name": "vue-why-did-you-render",
+    "version": "1.0.0",
+    "description": "Debug Vue render performance - see why your components are re-rendering",
+    "type": "module",
+    "main": "./dist/index.cjs",
+    "module": "./dist/index.mjs",
+    "types": "./dist/index.d.ts",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.mjs",
+            "require": "./dist/index.cjs"
+        }
+    },
+    "scripts": {
+        "build": "tsup",
+        "dev": "tsup --watch",
+        "test": "vitest run",
+        "test:watch": "vitest --watch",
+        "typecheck": "tsc --noEmit",
+        "lint": "eslint src tests",
+        "lint:fix": "eslint src tests --fix",
+        "format": "prettier --write \"src/**/*.ts\" \"tests/**/*.ts\"",
+        "format:check": "prettier --check \"src/**/*.ts\" \"tests/**/*.ts\"",
+        "check": "pnpm run typecheck && pnpm run lint && pnpm run format:check",
+        "prepublishOnly": "pnpm run check && pnpm run test && pnpm run build",
+        "prepare": "husky",
+        "commit": "cz"
+    },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/iamdarshshah/vue-why-did-you-render.git"
+    },
+    "keywords": [
+        "vue",
+        "vue3",
+        "debugging",
+        "performance",
+        "render",
+        "reactivity"
+    ],
+    "author": "Darsh Shah",
+    "license": "MIT",
+    "bugs": {
+        "url": "https://github.com/iamdarshshah/vue-why-did-you-render/issues"
+    },
+    "homepage": "https://github.com/iamdarshshah/vue-why-did-you-render#readme",
+    "dependencies": {
+        "vue": "^3.5.26"
+    },
+    "devDependencies": {
+        "@eslint/js": "^9.39.2",
+        "@types/node": "^25.0.3",
+        "commitizen": "^4.3.1",
+        "cz-conventional-changelog": "^3.3.0",
+        "eslint": "^9.39.2",
+        "husky": "^9.1.7",
+        "lint-staged": "^16.2.7",
+        "prettier": "^3.7.4",
+        "ts-node": "^10.9.2",
+        "tsup": "^8.5.1",
+        "typescript": "^5.9.3",
+        "typescript-eslint": "^8.51.0",
+        "vitest": "^4.0.16"
+    },
+    "lint-staged": {
+        "src/**/*.ts": [
+            "eslint --fix",
+            "prettier --write"
+        ],
+        "tests/**/*.ts": [
+            "eslint --fix",
+            "prettier --write"
+        ]
+    },
+    "config": {
+        "commitizen": {
+            "path": "./node_modules/cz-conventional-changelog"
+        }
+    }
+}

@@ -1,0 +1,43 @@
+# Source files (dist is published)
+src/
+
+# Examples
+examples/
+
+# Config files
+tsconfig.json
+tsup.config.ts
+.eslintrc*
+.prettierrc*
+.editorconfig
+
+# Development files
+*.test.ts
+*.spec.ts
+__tests__/
+coverage/
+.vscode/
+.idea/
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+.travis.yml
+
+# Misc
+*.log
+*.tsbuildinfo
+.DS_Store
+Thumbs.db
+.env*
+
+# Lock files
+pnpm-lock.yaml
+package-lock.json
+yarn.lock
+

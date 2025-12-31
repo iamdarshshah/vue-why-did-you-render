@@ -1,0 +1,43 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Test coverage
+coverage/
+
+# TypeScript cache
+*.tsbuildinfo
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Examples build output
+examples/*/dist/
+examples/*/.vite/
+
+# Lock files (keep only one - we use pnpm)
+# Uncomment the one you don't use:
+# package-lock.json
+# yarn.lock
+# pnpm-lock.yaml
