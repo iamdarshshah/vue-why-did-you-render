@@ -1,0 +1,8 @@
+dist/
+node_modules/
+coverage/
+examples/
+*.md
+pnpm-lock.yaml
+package-lock.json
+
