@@ -1,3 +1,4 @@
+import { toRaw } from 'vue'
 import type {
     ComponentRenderEvent,
     DebuggerEvent,
@@ -5,6 +6,7 @@ import type {
     WhyDidYouRenderOptions,
     RenderStats,
 } from './types'
+import { PiniaTracker, type StorePropertyInfo } from './pinia-tracker'
 
 export class RenderRegistry {
     private registry = new Map<string, ComponentRenderEvent>()
@@ -25,9 +27,27 @@ export class RenderRegistry {
     // Track which components have had their initial render
     private initialRenderComplete = new Set<string>()
 
+    // Pinia store tracking
+    private piniaTracker: PiniaTracker | null = null
+
     constructor(options: WhyDidYouRenderOptions) {
         this.options = options
         this.isPaused = options.pauseOnInit ?? false
+
+        // Initialize Pinia tracker if enabled
+        if (options.enablePiniaTracking) {
+            this.piniaTracker = new PiniaTracker()
+            if (options.debug) {
+                this.piniaTracker.setDebug(true)
+            }
+        }
+    }
+
+    /**
+     * Get the Pinia tracker instance for registering stores
+     */
+    getPiniaTracker(): PiniaTracker | null {
+        return this.piniaTracker
     }
 
     recordTrackedDependency(
@@ -53,6 +73,7 @@ export class RenderRegistry {
         let key = event.key
         let type = event.type
         let source: 'ref' | 'reactive' | 'computed' | 'store' | 'prop' | 'unknown' = 'unknown'
+        let arrayIndex: string | number | undefined
 
         // Vue 3.4+ may only provide effect without target/type/key
         // This happens when computed dependencies trigger the render
@@ -145,7 +166,62 @@ export class RenderRegistry {
             }
         }
 
-        const isNoOp = this.detectNoOp(oldValue, newValue)
+        let isNoOp = this.detectNoOp(oldValue, newValue)
+
+        // Try to look up Pinia store property info
+        let storeId: string | undefined
+        let storePropName: string | undefined
+        let storePropType: 'state' | 'getter' | 'action' | undefined
+
+        if (this.piniaTracker) {
+            // Try multiple lookup strategies to find store property info
+            let storeInfo = this.lookupStoreProperty(target, effect)
+
+            // Fallback: try value-based lookup for computed getters
+            if (!storeInfo && type === 'get') {
+                storeInfo = this.lookupStorePropertyByValue(newValue, type)
+            }
+
+            if (storeInfo) {
+                storeId = storeInfo.storeId
+                storePropName = storeInfo.propName
+                storePropType = storeInfo.propType
+                source = 'store'
+
+                // For array mutations, preserve the original key as arrayIndex
+                // before overwriting key with the property name
+                const originalKey = key
+                const isArrayMutation =
+                    type === 'add' ||
+                    type === 'delete' ||
+                    (type === 'set' && typeof originalKey === 'string' && /^\d+$/.test(originalKey))
+
+                // Use the actual property name as the key
+                key = storeInfo.propName
+
+                // For getters, use the cached old value since Vue doesn't provide it
+                if (storePropType === 'getter') {
+                    const cachedValues = this.piniaTracker.getGetterValueWithOld(
+                        storeInfo.storeId,
+                        storeInfo.propName
+                    )
+                    oldValue = cachedValues.oldValue
+                    newValue = cachedValues.newValue
+                    // Recalculate isNoOp with the correct getter values
+                    isNoOp = this.detectNoOp(oldValue, newValue)
+                }
+
+                // Store array index for formatting
+                if (
+                    isArrayMutation &&
+                    originalKey !== undefined &&
+                    typeof originalKey !== 'symbol'
+                ) {
+                    arrayIndex = originalKey
+                }
+            }
+        }
+
         const trigger: RenderTrigger = {
             key: key,
             type: type,
@@ -153,13 +229,94 @@ export class RenderRegistry {
             newValue: newValue,
             isNoOp,
             source,
-            path: this.buildPath(target, key),
+            path: this.buildPath(target, key, storeId),
+            storeId,
+            storePropName,
+            storePropType,
+            arrayIndex,
         }
 
         if (!this.pendingTriggers.has(componentId)) {
             this.pendingTriggers.set(componentId, [])
         }
         this.pendingTriggers.get(componentId)!.push(trigger)
+    }
+
+    /**
+     * Try multiple strategies to look up store property info
+     */
+    private lookupStoreProperty(
+        target: object | undefined,
+        effect: any
+    ): StorePropertyInfo | undefined {
+        if (!this.piniaTracker) return undefined
+
+        // Strategy 1: Direct target lookup (works for state refs)
+        if (target) {
+            const info = this.piniaTracker.lookupProperty(target)
+            if (info) return info
+        }
+
+        // Strategy 2: Check effect.computed (for computed getters in Vue 3.4+)
+        if (effect?.computed) {
+            const info = this.piniaTracker.lookupProperty(effect.computed)
+            if (info) return info
+        }
+
+        // Strategy 3: Check effect.fn if it's a computed's getter
+        if (effect?.fn) {
+            const info = this.piniaTracker.lookupProperty(effect.fn)
+            if (info) return info
+        }
+
+        // Strategy 4: Walk effect dependencies (Vue 3.4+ linked list structure)
+        if (effect?.deps) {
+            let dep = effect.deps
+            while (dep) {
+                // Check the computed ref in the dep
+                if (dep.dep?.computed) {
+                    const info = this.piniaTracker.lookupProperty(dep.dep.computed)
+                    if (info) return info
+                }
+                // Check the target in the dep
+                if (dep.dep?.target) {
+                    const info = this.piniaTracker.lookupProperty(dep.dep.target)
+                    if (info) return info
+                }
+                dep = dep.nextDep
+            }
+        }
+
+        // Strategy 5: For older Vue versions, check deps array
+        if (Array.isArray(effect?.deps)) {
+            for (const dep of effect.deps) {
+                if (dep?.computed) {
+                    const info = this.piniaTracker.lookupProperty(dep.computed)
+                    if (info) return info
+                }
+            }
+        }
+
+        // Strategy 6: Check if target is a computed ref with effect property
+        if (target) {
+            const targetAny = target as any
+            // The target might be the computed's internal value holder
+            // Check parent computed ref
+            if (targetAny._value !== undefined && targetAny.effect) {
+                const info = this.piniaTracker.lookupProperty(target)
+                if (info) return info
+            }
+        }
+
+        return undefined
+    }
+
+    /**
+     * Try to look up store property by value (fallback strategy)
+     */
+    private lookupStorePropertyByValue(value: any, type: string): StorePropertyInfo | undefined {
+        if (!this.piniaTracker) return undefined
+        return this.piniaTracker.lookupByValue(value, type)
     }
 
     finalizeRender(componentId: string, componentName: string): ComponentRenderEvent | null {
@@ -175,6 +332,9 @@ export class RenderRegistry {
             this.initialRenderComplete.add(componentId)
         }
 
+        // Get the render count for this component
+        const renderCount = this.rendersByComponent.get(componentName) || 0
+
         const event: ComponentRenderEvent = {
             componentName,
             componentId,
@@ -183,6 +343,7 @@ export class RenderRegistry {
             tracked,
             isInitialRender,
             rerenderReason: this.inferReason(triggers),
+            renderCount,
         }
 
         // Check throttling
@@ -228,6 +389,12 @@ export class RenderRegistry {
 
         if (this.options.onRender) {
             this.options.onRender(event)
+        }
+
+        // Snapshot getter values after render completes
+        // This captures current values for comparison in the next render cycle
+        if (this.piniaTracker) {
+            this.piniaTracker.snapshotAllGetterValues()
         }
 
         this.pendingTriggers.delete(componentId)
@@ -286,18 +453,28 @@ export class RenderRegistry {
         if (typeof oldValue !== typeof newValue) return false
 
         // For objects, do a shallow comparison
+        // Use toRaw to handle Vue reactive proxies
         if (typeof oldValue === 'object' && oldValue !== null && newValue !== null) {
+            const rawOld = toRaw(oldValue)
+            const rawNew = toRaw(newValue)
+
             // Arrays
-            if (Array.isArray(oldValue) && Array.isArray(newValue)) {
-                if (oldValue.length !== newValue.length) return false
-                return oldValue.every((v, i) => v === newValue[i])
+            if (Array.isArray(rawOld) && Array.isArray(rawNew)) {
+                if (rawOld.length !== rawNew.length) return false
+                // Compare raw values of each element
+                return rawOld.every((v, i) => {
+                    const rawV = toRaw(v)
+                    const rawNewV = toRaw(rawNew[i])
+                    // For objects, compare by reference (shallow)
+                    return rawV === rawNewV
+                })
             }
 
             // Plain objects - shallow compare
-            const oldKeys = Object.keys(oldValue)
-            const newKeys = Object.keys(newValue)
+            const oldKeys = Object.keys(rawOld)
+            const newKeys = Object.keys(rawNew)
             if (oldKeys.length !== newKeys.length) return false
-            return oldKeys.every(key => oldValue[key] === newValue[key])
+            return oldKeys.every(key => toRaw(rawOld[key]) === toRaw(rawNew[key]))
         }
 
         return false
@@ -306,10 +483,19 @@ export class RenderRegistry {
     /**
      * Build a readable path string for the trigger
      */
-    private buildPath(target: object | undefined, key: string | symbol | undefined): string {
+    private buildPath(
+        target: object | undefined,
+        key: string | symbol | undefined,
+        storeId?: string
+    ): string {
         if (!key) return 'unknown'
 
         const keyStr = typeof key === 'symbol' ? key.description || 'symbol' : String(key)
+
+        // If we have a store ID from Pinia tracking, use it
+        if (storeId) {
+            return `${storeId}.${keyStr}`
+        }
 
         // Handle undefined target (Vue 3.4+ computed dependency chains)
         if (!target) {
