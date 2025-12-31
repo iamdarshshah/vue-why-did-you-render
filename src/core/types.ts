@@ -34,6 +34,8 @@ export interface RenderTrigger {
     storePropType?: 'state' | 'getter' | 'action'
     /** For array mutations, the index that was modified */
     arrayIndex?: string | number
+    /** Internal: Reference to computed ref for deferred value resolution */
+    _computedRef?: any
 }
 
 export interface ComponentRenderEvent {
