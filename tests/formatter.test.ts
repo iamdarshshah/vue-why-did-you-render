@@ -111,7 +111,7 @@ describe('RenderFormatter', () => {
             })
             const lines = formatter.format(event)
 
-            expect(lines.some(l => l.includes('2 unnecessary re-renders'))).toBe(true)
+            expect(lines.some(l => l.includes('2 unnecessary triggers'))).toBe(true)
         })
 
         it('should show source breakdown for multiple sources', () => {

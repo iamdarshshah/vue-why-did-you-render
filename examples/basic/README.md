@@ -31,7 +31,7 @@ Multiple refs and computed properties. Shows how computed dependencies trigger r
 ⚠️ [NoOpDemo] Re-rendered
   Triggers:
     ❌ [ref:set] "value" (5 → 5) (UNCHANGED!)
-  ⚠️  Found 1 unnecessary re-render (values unchanged)
+  ⚠️  Found 1 unnecessary trigger (values unchanged)
 ```
 
 ### 4. ReactiveDemo (Reactive Object)

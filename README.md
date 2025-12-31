@@ -66,7 +66,7 @@ For unnecessary renders (values unchanged):
 ⚠️  [Dashboard] (render #3) Re-rendered
   Triggers:
     ❌ [reactive:set] "count" (5 → 5) (UNCHANGED!)
-  ⚠️  Found 1 unnecessary re-render (values unchanged)
+  ⚠️  Found 1 unnecessary trigger (values unchanged)
 ```
 
 ## API
