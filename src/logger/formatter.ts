@@ -74,8 +74,16 @@ export class RenderFormatter {
             return `    ${icon} [store:${trigger.storeId}] ${propType}"${trigger.storePropName}" ${valueChange}${note}`
         }
 
-        const valueChange = this.formatValueChange(trigger.oldValue, trigger.newValue)
         const typeStr = `[${trigger.source}:${trigger.type}]`
+
+        // Format array mutations specially for clearer output
+        if (trigger.arrayIndex !== undefined) {
+            const mutationType = this.formatMutationType(trigger.type)
+            const valueStr = this.formatArrayMutationValue(trigger)
+            return `    ${icon} ${typeStr} [${trigger.arrayIndex}] ${mutationType}: ${valueStr}${note}`
+        }
+
+        const valueChange = this.formatValueChange(trigger.oldValue, trigger.newValue)
         const keyStr = trigger.key !== undefined ? String(trigger.key) : 'unknown'
 
         return `    ${icon} ${typeStr} "${keyStr}" ${valueChange}${note}`
@@ -218,7 +226,7 @@ export class RenderFormatter {
         // Warn about unchanged values
         if (noOpCount > 0) {
             const plural = noOpCount !== 1 ? 's' : ''
-            lines.push(`  ⚠️  Found ${noOpCount} unnecessary re-render${plural} (values unchanged)`)
+            lines.push(`  ⚠️  Found ${noOpCount} unnecessary trigger${plural} (values unchanged)`)
         }
 
         // Breakdown by source
