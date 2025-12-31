@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>vue-why-did-you-render - Composables Example</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+        max-width: 900px;
+        margin: 0 auto;
+        padding: 20px;
+        background: #f5f5f5;
+      }
+      h1 {
+        color: #42b883;
+      }
+      .card {
+        background: white;
+        border-radius: 8px;
+        padding: 20px;
+        margin: 20px 0;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      }
+      .card h2 {
+        margin-top: 0;
+        color: #35495e;
+      }
+      button {
+        background: #42b883;
+        color: white;
+        border: none;
+        padding: 8px 16px;
+        border-radius: 4px;
+        cursor: pointer;
+        margin-right: 8px;
+        font-size: 14px;
+      }
+      button:hover {
+        background: #35a472;
+      }
+      button.warning {
+        background: #f59e0b;
+      }
+      button.warning:hover {
+        background: #d97706;
+      }
+      button.danger {
+        background: #ef4444;
+      }
+      button.danger:hover {
+        background: #dc2626;
+      }
+      .hint {
+        background: #e8f5e9;
+        border-left: 4px solid #42b883;
+        padding: 10px 15px;
+        margin-top: 15px;
+        font-size: 14px;
+        color: #35495e;
+      }
+      .hint.warning {
+        background: #fff8e1;
+        border-left-color: #f59e0b;
+      }
+      code {
+        background: #e8e8e8;
+        padding: 2px 6px;
+        border-radius: 3px;
+        font-size: 13px;
+      }
+      .shared-indicator {
+        display: inline-block;
+        background: #8b5cf6;
+        color: white;
+        padding: 2px 8px;
+        border-radius: 12px;
+        font-size: 11px;
+        margin-left: 8px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
+
