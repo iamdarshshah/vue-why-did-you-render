@@ -74,6 +74,7 @@ export class RenderRegistry {
         let type = event.type
         let source: 'ref' | 'reactive' | 'computed' | 'store' | 'prop' | 'unknown' = 'unknown'
         let arrayIndex: string | number | undefined
+        let computedRefForDeferred: any = undefined
 
         // Vue 3.4+ may only provide effect without target/type/key
         // This happens when computed dependencies trigger the render
@@ -87,37 +88,39 @@ export class RenderRegistry {
                 while (dep) {
                     const depTarget = dep.dep?.computed || dep.dep?.target
                     if (depTarget) {
-                        // Get both cached and current values
-                        let cachedValue: any
-                        let currentValue: any
-                        try {
-                            cachedValue = depTarget._value
-                            currentValue = depTarget.value
-                        } catch {
-                            cachedValue = undefined
-                            currentValue = '[error reading value]'
-                        }
-
-                        // Detect computed: has effect OR _value differs from .value (lazy recomputation)
-                        const isComputed =
-                            depTarget.__v_isComputed ||
-                            depTarget.effect ||
-                            (depTarget.__v_isRef && cachedValue !== currentValue)
+                        // Detect computed: has effect OR __v_isComputed flag
+                        const isComputed = depTarget.__v_isComputed || depTarget.effect
 
                         if (isComputed) {
                             source = 'computed'
                             key = 'value'
                             type = 'get'
-                            oldValue = cachedValue // OLD cached value before recompute
-                            newValue = currentValue // NEW recomputed value
+                            // Read _value FIRST to get the cached old value
+                            // Vue's lazy computed keeps old value in _value until .value is accessed
+                            try {
+                                oldValue = depTarget._value
+                            } catch {
+                                oldValue = undefined
+                            }
+                            // For computed refs, we can't reliably get the new value during rtg
+                            // because Vue hasn't recomputed it yet. Store a reference to resolve later.
+                            // We'll update the newValue in finalizeRender after the component renders.
+                            newValue = oldValue // Placeholder, will be updated in finalizeRender
+                            // Store the computed ref for later resolution
+                            computedRefForDeferred = depTarget
                             break
                         } else if (depTarget.__v_isRef) {
                             source = 'ref'
                             key = 'value'
                             type = 'set'
-                            // For regular refs, cached and current should be the same
-                            oldValue = cachedValue
-                            newValue = currentValue
+                            // For regular refs, use _value for both (already updated)
+                            try {
+                                oldValue = depTarget._value
+                                newValue = depTarget._value
+                            } catch {
+                                oldValue = undefined
+                                newValue = undefined
+                            }
                             break
                         }
                     }
@@ -138,14 +141,17 @@ export class RenderRegistry {
                 source = 'computed'
                 key = key ?? 'value'
                 type = type ?? 'get'
-                // For computed, try to get old from _value and new from .value
+                // For computed, read _value FIRST for old, then defer new value
                 if (oldValue === undefined && newValue === undefined) {
+                    // Read _value first (cached old value before recompute)
                     try {
-                        oldValue = target._value // cached before recompute
-                        newValue = target.value // triggers recompute
+                        oldValue = target._value
                     } catch {
-                        // Ignore
+                        oldValue = undefined
                     }
+                    // Defer new value resolution to finalizeRender
+                    newValue = oldValue // Placeholder
+                    computedRefForDeferred = target
                 }
             } else if (target.__v_isRef) {
                 source = 'ref'
@@ -167,6 +173,16 @@ export class RenderRegistry {
         }
 
         let isNoOp = this.detectNoOp(oldValue, newValue)
+
+        // Detect array mutations for any reactive array (not just stores)
+        const isArrayMutation =
+            type === 'add' ||
+            type === 'delete' ||
+            (type === 'set' && typeof key === 'string' && /^\d+$/.test(key))
+
+        if (isArrayMutation && key !== undefined && typeof key !== 'symbol') {
+            arrayIndex = key
+        }
 
         // Try to look up Pinia store property info
         let storeId: string | undefined
@@ -234,6 +250,8 @@ export class RenderRegistry {
             storePropName,
             storePropType,
             arrayIndex,
+            // Store computed ref for deferred value resolution in finishRender
+            _computedRef: computedRefForDeferred,
         }
 
         if (!this.pendingTriggers.has(componentId)) {
@@ -326,6 +344,24 @@ export class RenderRegistry {
         const tracked = this.trackedDeps.get(componentId) || new Set()
         const now = Date.now()
         const isInitialRender = !this.initialRenderComplete.has(componentId)
+
+        // Resolve deferred computed values now that the render is complete
+        // At this point, Vue has accessed the computed refs during render, so they're updated
+        for (const trigger of triggers) {
+            if (trigger._computedRef && trigger.source === 'computed') {
+                try {
+                    // Now the computed should be recomputed, read its current value
+                    const currentValue = trigger._computedRef.value
+                    trigger.newValue = currentValue
+                    // Recalculate isNoOp with the correct new value
+                    trigger.isNoOp = this.detectNoOp(trigger.oldValue, currentValue)
+                } catch {
+                    trigger.newValue = '[error reading computed]'
+                }
+                // Clean up the internal reference
+                delete trigger._computedRef
+            }
+        }
 
         // Mark component as having completed initial render
         if (isInitialRender) {
@@ -554,6 +590,19 @@ export class RenderRegistry {
         this.noOpRenderCount = 0
         this.lastRenderTime.clear()
         this.throttledEvents.clear()
+        this.initialRenderComplete.clear()
+    }
+
+    /**
+     * Clean up tracking data for a specific component (e.g., on unmount).
+     * This prevents memory leaks from accumulating component tracking data.
+     */
+    cleanupComponent(componentId: string): void {
+        this.trackedDeps.delete(componentId)
+        this.pendingTriggers.delete(componentId)
+        this.lastRenderTime.delete(componentId)
+        this.throttledEvents.delete(componentId)
+        this.initialRenderComplete.delete(componentId)
     }
 
     getStats(): RenderStats {
