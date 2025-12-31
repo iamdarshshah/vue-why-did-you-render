@@ -26,12 +26,12 @@ Basic `ref()` reactivity tracking. Click increment/decrement to see:
 Multiple refs and computed properties. Shows how computed dependencies trigger re-renders.
 
 ### 3. NoOpDemo (Performance Issue Detection)
-**The most important demo!** Shows how the library detects wasteful no-op renders:
+**The most important demo!** Shows how the library detects wasteful unchanged renders:
 ```
 ⚠️ [NoOpDemo] Re-rendered
   Triggers:
-    ❌ [ref:set] "value" (5 → 5) (NO-OP!)
-  ⚠️  Found 1 no-op trigger (values unchanged)
+    ❌ [ref:set] "value" (5 → 5) (UNCHANGED!)
+  ⚠️  Found 1 unnecessary re-render (values unchanged)
 ```
 
 ### 4. ReactiveDemo (Reactive Object)

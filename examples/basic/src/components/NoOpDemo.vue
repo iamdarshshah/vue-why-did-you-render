@@ -3,11 +3,11 @@ import { ref, shallowRef, triggerRef } from "vue";
 
 /**
  * NoOpDemo Component
- * Demonstrates NO-OP render detection.
+ * Demonstrates UNCHANGED render detection.
  *
  * ⚠️ This is a PERFORMANCE ISSUE that vue-why-did-you-render helps detect!
  *
- * Note: Vue 3.4+ optimizes away primitive no-ops (value.value = 5 when already 5).
+ * Note: Vue 3.4+ optimizes away primitive unchanged values (value.value = 5 when already 5).
  * But it CANNOT optimize away:
  * - triggerRef() calls on unchanged refs
  * - shallowRef with same object reference
@@ -64,15 +64,15 @@ function triggerMultipleNoOps() {
 
     <button @click="triggerRealChange">✅ Trigger Real Change</button>
     <button class="warning" @click="triggerNoOp">(Optimized) Set value = 5</button>
-    <button class="warning" @click="triggerForcedNoOp">⚠️ Force NO-OP (triggerRef)</button>
-    <button class="warning" @click="triggerObjectNoOp">⚠️ Object Spread NO-OP</button>
-    <button class="warning" @click="triggerMultipleNoOps">⚠️ Multiple NO-OPs</button>
+    <button class="warning" @click="triggerForcedNoOp">⚠️ Force Unchanged (triggerRef)</button>
+    <button class="warning" @click="triggerObjectNoOp">⚠️ Object Spread Unchanged</button>
+    <button class="warning" @click="triggerMultipleNoOps">⚠️ Multiple Unchanged</button>
 
     <div class="hint">
-      <strong>⚠️ NO-OP renders</strong> are performance issues!<br />
+      <strong>⚠️ Unchanged renders</strong> are performance issues!<br />
       • "Set value = 5" - Vue 3.4+ optimizes this away (no re-render)<br />
       • Orange ⚠️ buttons force re-renders with unchanged values<br />
-      • Watch for ❌ markers in the console
+      • Watch for ❌ (UNCHANGED!) markers in the console
     </div>
   </div>
 </template>

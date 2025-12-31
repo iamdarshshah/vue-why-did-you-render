@@ -43,22 +43,30 @@ app.mount("#app");
 
 ## Console Output
 
-When a component re-renders, you'll see:
+When a component mounts:
 
 ```
-✅ [UserCard] Re-rendered
+✅ [UserCard] Mounted
+  Triggers:
+    ✅ [ref:set] "isOpen" (undefined → false)
+```
+
+When a component re-renders:
+
+```
+✅ [UserCard] (render #2) Re-rendered
   Triggers:
     ✅ [ref:set] "isOpen" (false → true)
   Source breakdown: ref(1)
 ```
 
-For no-op renders:
+For unnecessary renders (values unchanged):
 
 ```
-⚠️  [Dashboard] Re-rendered
+⚠️  [Dashboard] (render #3) Re-rendered
   Triggers:
-    ❌ [reactive:set] "count" (5 → 5) (NO-OP!)
-  ⚠️  Found 1 no-op trigger (values unchanged)
+    ❌ [reactive:set] "count" (5 → 5) (UNCHANGED!)
+  ⚠️  Found 1 unnecessary re-render (values unchanged)
 ```
 
 ## API
@@ -95,7 +103,7 @@ interface WhyDidYouRenderOptions {
 
   // Integration
   onRender?: (event) => void; // Custom callback
-  enablePiniaTracking?: boolean; // Default: false (coming soon)
+  enablePiniaTracking?: boolean; // Default: false
   enableDevtools?: boolean; // Default: false (coming soon)
   collectStackTrace?: boolean; // Default: false
 }
@@ -175,6 +183,39 @@ enableWhyDidYouRender(app, {
 });
 ```
 
+### Pinia Store Tracking
+
+```typescript
+import { createPinia } from 'pinia'
+import { enableWhyDidYouRender } from 'vue-why-did-you-render'
+
+const app = createApp(App)
+const pinia = createPinia()
+
+app.use(pinia)
+
+// Enable with Pinia tracking
+const { registerStore } = enableWhyDidYouRender(app, {
+  logOnConsole: true,
+  enablePiniaTracking: true,
+})
+
+// Register stores you want to track
+import { useMyStore } from './stores/myStore'
+const myStore = useMyStore()
+registerStore(myStore)
+```
+
+Console output for Pinia stores:
+
+```
+✅ [MyComponent] Re-rendered
+  Triggers:
+    ✅ [store:myStore] (state) "loading" (false → true)
+    ✅ [store:myStore] (getter) "filteredItems" (Array(5) → Array(3))
+  Source breakdown: store(2)
+```
+
 ## How It Works
 
 The library hooks into Vue 3's internal reactivity system using:
@@ -196,8 +237,8 @@ Then it:
 ### Badges
 
 - ✅ **Green check** - Expected render (value changed)
-- ⚠️ **Yellow warning** - Suspicious (no-op or multiple sources)
-- ❌ **Red X** - No-op render (value unchanged)
+- ⚠️ **Yellow warning** - Suspicious (unchanged values or multiple sources)
+- ❌ **Red X** - Unnecessary render (value unchanged)
 
 ### Source Types
 
@@ -244,10 +285,10 @@ The library is designed to have minimal overhead:
    });
    ```
 
-3. **Check for no-ops** - These are performance issues
+3. **Check for unchanged values** - These are performance issues
 
    ```
-   ❌ [Component] has a no-op render
+   ❌ [store:myStore] (getter) "count" (5 → 5) (UNCHANGED!)
    → This means unnecessary rendering is happening
    ```
 
@@ -294,7 +335,7 @@ tracker.pause();
 
 ## Roadmap
 
-- [ ] Pinia store mutation tracking
+- [x] Pinia store mutation tracking
 - [ ] Vue Devtools panel integration
 - [ ] Performance timeline visualization
 - [ ] Render comparison between commits
