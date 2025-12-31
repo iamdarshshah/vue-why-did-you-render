@@ -26,6 +26,14 @@ export interface RenderTrigger {
     isNoOp: boolean
     source: 'ref' | 'reactive' | 'computed' | 'store' | 'prop' | 'unknown'
     path: string
+    /** Pinia store ID if this trigger came from a store */
+    storeId?: string
+    /** Property name in the Pinia store (e.g., 'totalServices', 'loading') */
+    storePropName?: string
+    /** Property type in the Pinia store ('state' or 'getter') */
+    storePropType?: 'state' | 'getter' | 'action'
+    /** For array mutations, the index that was modified */
+    arrayIndex?: string | number
 }
 
 export interface ComponentRenderEvent {
@@ -36,6 +44,8 @@ export interface ComponentRenderEvent {
     tracked: Set<string | symbol>
     isInitialRender: boolean
     rerenderReason: 'initial' | 'prop-change' | 'state-change' | 'store-change'
+    /** How many times this component has re-rendered in this session */
+    renderCount: number
 }
 
 export interface WhyDidYouRenderOptions {
@@ -52,6 +62,8 @@ export interface WhyDidYouRenderOptions {
     enableDevtools?: boolean
     throttleMs?: number
     collectStackTrace?: boolean
+    /** Enable debug logging for troubleshooting store property resolution */
+    debug?: boolean
 }
 
 export interface WhyDidYouRenderInstance {
@@ -60,6 +72,10 @@ export interface WhyDidYouRenderInstance {
     reset: () => void
     getStats: () => RenderStats
     configure: (options: Partial<WhyDidYouRenderOptions>) => void
+    /** Register a Pinia store for tracking (requires enablePiniaTracking: true) */
+    registerStore: (store: any) => void
+    /** Create a Pinia plugin that auto-registers all stores */
+    createPiniaPlugin: () => (context: { store: any }) => void
 }
 
 export interface RenderStats {

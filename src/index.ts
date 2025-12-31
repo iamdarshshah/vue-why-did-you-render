@@ -47,6 +47,8 @@ export function enableWhyDidYouRender(
                 noOpRenders: 0,
             }),
             configure: () => {},
+            registerStore: () => {},
+            createPiniaPlugin: () => () => {},
         }
     }
 
@@ -106,11 +108,19 @@ export function enableWhyDidYouRender(
             },
         ]
 
+        // Track if we just handled mount to avoid duplicate logging
+        // Reset after microtask to handle components that don't get immediate updates
+        let justMounted = false
+
         // Hook into updated lifecycle
         const originalU = instance.u || []
         instance.u = [
             ...originalU,
             () => {
+                // Skip if we just handled this in mounted hook (same tick)
+                if (justMounted) {
+                    return
+                }
                 const renderEvent = registry.finalizeRender(componentId, componentName)
                 if (renderEvent && consoleLogger) {
                     consoleLogger(renderEvent)
@@ -126,7 +136,18 @@ export function enableWhyDidYouRender(
         instance.m = [
             ...originalM,
             () => {
-                registry.finalizeRender(componentId, componentName)
+                justMounted = true
+                // Reset after microtask so future updates aren't blocked
+                Promise.resolve().then(() => {
+                    justMounted = false
+                })
+                const renderEvent = registry.finalizeRender(componentId, componentName)
+                if (renderEvent && consoleLogger) {
+                    consoleLogger(renderEvent)
+                }
+                if (renderEvent && options.onRender) {
+                    options.onRender(renderEvent)
+                }
             },
         ]
     }
@@ -148,12 +169,37 @@ export function enableWhyDidYouRender(
         },
     })
 
+    // Get the Pinia tracker for registering stores
+    const piniaTracker = registry.getPiniaTracker()
+
+    /**
+     * Register a Pinia store for tracking.
+     * This allows the library to map reactive properties back to their store property names.
+     */
+    function registerStore(store: any): void {
+        if (piniaTracker) {
+            piniaTracker.registerStore(store)
+        }
+    }
+
+    /**
+     * Create a Pinia plugin that automatically registers all stores.
+     * Usage: pinia.use(tracker.createPiniaPlugin())
+     */
+    function createPiniaPlugin() {
+        return ({ store }: { store: any }) => {
+            registerStore(store)
+        }
+    }
+
     return {
         pause: () => registry.pause(),
         resume: () => registry.resume(),
         reset: () => registry.reset(),
         getStats: () => registry.getStats(),
         configure: opts => Object.assign(options, opts),
+        registerStore,
+        createPiniaPlugin,
     }
 }
 
