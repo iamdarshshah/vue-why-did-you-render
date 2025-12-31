@@ -1,6 +1,6 @@
 {
     "name": "vue-why-did-you-render",
-    "version": "1.0.1",
+    "version": "1.1.0",
     "description": "Debug Vue render performance - see why your components are re-rendering",
     "type": "module",
     "main": "./dist/index.cjs",
