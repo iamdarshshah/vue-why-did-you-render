@@ -19,6 +19,7 @@ describe('RenderFormatter', () => {
         tracked: new Set(),
         isInitialRender: false,
         rerenderReason: 'state-change',
+        renderCount: 1,
         ...overrides,
     })
 
@@ -54,11 +55,12 @@ describe('RenderFormatter', () => {
             expect(lines[0]).toContain('⚠️')
         })
 
-        it('should show initial render message when no triggers and isInitialRender is true', () => {
+        it('should show Mounted label for initial render', () => {
             const event = createMockEvent({ triggers: [], isInitialRender: true })
             const lines = formatter.format(event)
 
-            expect(lines.some(l => l.includes('Initial render'))).toBe(true)
+            expect(lines[0]).toContain('Mounted')
+            expect(lines[0]).not.toContain('Re-rendered')
         })
 
         it('should show "no triggers captured" message when no triggers and isInitialRender is false', () => {
@@ -97,7 +99,7 @@ describe('RenderFormatter', () => {
             const triggerLine = lines.find(l => l.includes('count'))
 
             expect(triggerLine).toContain('❌')
-            expect(triggerLine).toContain('(NO-OP!)')
+            expect(triggerLine).toContain('(UNCHANGED!)')
         })
 
         it('should show no-op warning count', () => {
@@ -109,7 +111,7 @@ describe('RenderFormatter', () => {
             })
             const lines = formatter.format(event)
 
-            expect(lines.some(l => l.includes('2 no-op triggers'))).toBe(true)
+            expect(lines.some(l => l.includes('2 unnecessary re-renders'))).toBe(true)
         })
 
         it('should show source breakdown for multiple sources', () => {
@@ -229,6 +231,7 @@ describe('createConsoleLogger', () => {
             tracked: new Set(),
             isInitialRender: true,
             rerenderReason: 'initial',
+            renderCount: 1,
         }
 
         logger(event)
@@ -267,6 +270,7 @@ describe('createConsoleLogger', () => {
             tracked: new Set(),
             isInitialRender: false,
             rerenderReason: 'state-change',
+            renderCount: 1,
         }
 
         logger(event)
@@ -304,6 +308,7 @@ describe('createConsoleLogger', () => {
             tracked: new Set(),
             isInitialRender: false,
             rerenderReason: 'state-change',
+            renderCount: 1,
         }
 
         logger(event)
@@ -314,5 +319,95 @@ describe('createConsoleLogger', () => {
         groupSpy.mockRestore()
         logSpy.mockRestore()
         groupEndSpy.mockRestore()
+    })
+})
+
+describe('RenderFormatter - Pinia store formatting', () => {
+    let formatter: RenderFormatter
+
+    beforeEach(() => {
+        formatter = new RenderFormatter(3, 100)
+    })
+
+    const createMockEvent = (
+        overrides: Partial<ComponentRenderEvent> = {}
+    ): ComponentRenderEvent => ({
+        componentName: 'TestComponent',
+        componentId: 'test-1',
+        timestamp: Date.now(),
+        triggers: [],
+        tracked: new Set(),
+        isInitialRender: false,
+        rerenderReason: 'state-change',
+        renderCount: 1,
+        ...overrides,
+    })
+
+    it('should format store state trigger with store name and property', () => {
+        const event = createMockEvent({
+            triggers: [
+                {
+                    key: 'loading',
+                    type: 'set',
+                    oldValue: true,
+                    newValue: false,
+                    isNoOp: false,
+                    source: 'store',
+                    path: 'services.loading',
+                    storeId: 'services',
+                    storePropName: 'loading',
+                },
+            ],
+        })
+        const lines = formatter.format(event)
+
+        expect(lines.join('\n')).toContain('[store:services]')
+        expect(lines.join('\n')).toContain('(state)')
+        expect(lines.join('\n')).toContain('"loading"')
+    })
+
+    it('should format store getter trigger with store name and property', () => {
+        const event = createMockEvent({
+            triggers: [
+                {
+                    key: 'totalServices',
+                    type: 'get',
+                    oldValue: 55,
+                    newValue: 55,
+                    isNoOp: true,
+                    source: 'store',
+                    path: 'services.totalServices',
+                    storeId: 'services',
+                    storePropName: 'totalServices',
+                },
+            ],
+        })
+        const lines = formatter.format(event)
+
+        expect(lines.join('\n')).toContain('[store:services]')
+        expect(lines.join('\n')).toContain('(getter)')
+        expect(lines.join('\n')).toContain('"totalServices"')
+        expect(lines.join('\n')).toContain('UNCHANGED')
+    })
+
+    it('should fall back to regular formatting for non-store triggers', () => {
+        const event = createMockEvent({
+            triggers: [
+                {
+                    key: 'count',
+                    type: 'set',
+                    oldValue: 1,
+                    newValue: 2,
+                    isNoOp: false,
+                    source: 'ref',
+                    path: 'count',
+                },
+            ],
+        })
+        const lines = formatter.format(event)
+
+        expect(lines.join('\n')).toContain('[ref:set]')
+        expect(lines.join('\n')).toContain('"count"')
+        expect(lines.join('\n')).not.toContain('[store:')
     })
 })

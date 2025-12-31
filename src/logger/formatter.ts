@@ -18,10 +18,17 @@ export class RenderFormatter {
     format(event: ComponentRenderEvent): string[] {
         const lines: string[] = []
 
-        // Header with badge indicator
+        // Header with badge indicator and render count
         const hasNoOps = event.triggers.some(t => t.isNoOp)
         const badge = hasNoOps ? '⚠️' : '✅'
-        lines.push(`${badge} [${event.componentName}] Re-rendered`)
+
+        // Different labels for initial render vs re-render
+        if (event.isInitialRender) {
+            lines.push(`${badge} [${event.componentName}] Mounted`)
+        } else {
+            const countLabel = event.renderCount > 1 ? ` (render #${event.renderCount})` : ''
+            lines.push(`${badge} [${event.componentName}]${countLabel} Re-rendered`)
+        }
 
         // Triggers section
         if (event.triggers.length > 0) {
@@ -30,7 +37,7 @@ export class RenderFormatter {
                 lines.push(this.formatTrigger(trigger))
             })
         } else if (event.isInitialRender) {
-            lines.push('  (Initial render)')
+            // No additional message needed for initial mount
         } else {
             // Re-render with no captured triggers (Vue optimized away or unknown cause)
             lines.push('  (No triggers captured - possibly batched or parent re-render)')
@@ -50,12 +57,76 @@ export class RenderFormatter {
      */
     private formatTrigger(trigger: RenderTrigger): string {
         const icon = trigger.isNoOp ? '❌' : '✅'
+        const note = trigger.isNoOp ? ' (UNCHANGED!)' : ''
+
+        // Format store triggers specially to show store name and property
+        if (trigger.source === 'store' && trigger.storeId && trigger.storePropName) {
+            const propType = this.inferStorePropType(trigger)
+
+            // For array mutations, show the operation type and index
+            if (trigger.arrayIndex !== undefined) {
+                const mutationType = this.formatMutationType(trigger.type)
+                const valueStr = this.formatArrayMutationValue(trigger)
+                return `    ${icon} [store:${trigger.storeId}] ${propType}"${trigger.storePropName}[${trigger.arrayIndex}]" ${mutationType}: ${valueStr}${note}`
+            }
+
+            const valueChange = this.formatValueChange(trigger.oldValue, trigger.newValue)
+            return `    ${icon} [store:${trigger.storeId}] ${propType}"${trigger.storePropName}" ${valueChange}${note}`
+        }
+
+        const valueChange = this.formatValueChange(trigger.oldValue, trigger.newValue)
         const typeStr = `[${trigger.source}:${trigger.type}]`
         const keyStr = trigger.key !== undefined ? String(trigger.key) : 'unknown'
-        const valueChange = this.formatValueChange(trigger.oldValue, trigger.newValue)
-        const note = trigger.isNoOp ? ' (NO-OP!)' : ''
 
         return `    ${icon} ${typeStr} "${keyStr}" ${valueChange}${note}`
+    }
+
+    /**
+     * Format mutation type for display
+     */
+    private formatMutationType(type: string): string {
+        switch (type) {
+            case 'add':
+                return 'added'
+            case 'delete':
+                return 'deleted'
+            case 'set':
+                return 'updated'
+            default:
+                return type
+        }
+    }
+
+    /**
+     * Format value for array mutation display
+     */
+    private formatArrayMutationValue(trigger: RenderTrigger): string {
+        if (trigger.type === 'add') {
+            return this.stringifyValue(trigger.newValue)
+        } else if (trigger.type === 'delete') {
+            return this.stringifyValue(trigger.oldValue)
+        } else {
+            // For 'set', show old → new
+            return this.formatValueChange(trigger.oldValue, trigger.newValue)
+        }
+    }
+
+    /**
+     * Get the store property type label
+     */
+    private inferStorePropType(trigger: RenderTrigger): string {
+        // Use the explicit storePropType if available
+        if (trigger.storePropType) {
+            return `(${trigger.storePropType}) `
+        }
+        // Fallback: infer from trigger type
+        if (trigger.type === 'get') {
+            return '(getter) '
+        }
+        if (trigger.type === 'set') {
+            return '(state) '
+        }
+        return ''
     }
 
     /**
@@ -144,10 +215,10 @@ export class RenderFormatter {
         const lines: string[] = []
         const noOpCount = triggers.filter(t => t.isNoOp).length
 
-        // Warn about no-ops
+        // Warn about unchanged values
         if (noOpCount > 0) {
             const plural = noOpCount !== 1 ? 's' : ''
-            lines.push(`  ⚠️  Found ${noOpCount} no-op trigger${plural} (values unchanged)`)
+            lines.push(`  ⚠️  Found ${noOpCount} unnecessary re-render${plural} (values unchanged)`)
         }
 
         // Breakdown by source

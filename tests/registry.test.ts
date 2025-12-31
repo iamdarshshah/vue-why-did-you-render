@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
+import { ref, computed } from 'vue'
 import { RenderRegistry } from '../src/core/registry'
+import { PiniaTracker } from '../src/core/pinia-tracker'
 import type { WhyDidYouRenderOptions, DebuggerEvent } from '../src/core/types'
 
 describe('RenderRegistry', () => {
@@ -237,5 +239,131 @@ describe('RenderRegistry', () => {
             expect(Object.keys(stats.byComponent)).toHaveLength(0)
             expect(stats.noOpRenders).toBe(0)
         })
+    })
+})
+
+describe('PiniaTracker', () => {
+    let tracker: PiniaTracker
+
+    beforeEach(() => {
+        tracker = new PiniaTracker()
+    })
+
+    describe('registerStore', () => {
+        it('should register a store and track its properties', () => {
+            const countRef = ref(0)
+            const mockStore = {
+                $id: 'counter',
+                $state: { count: 0 },
+                count: countRef,
+            }
+
+            tracker.registerStore(mockStore)
+
+            // The ref should now be mapped to the store property
+            const result = tracker.lookupProperty(countRef)
+            expect(result).toEqual({
+                storeId: 'counter',
+                propName: 'count',
+                propType: 'state',
+            })
+        })
+
+        it('should track computed getters', () => {
+            const countRef = ref(5)
+            const doubleComputed = computed(() => countRef.value * 2)
+            const mockStore = {
+                $id: 'counter',
+                $state: { count: 5 },
+                count: countRef,
+                double: doubleComputed,
+            }
+
+            tracker.registerStore(mockStore)
+
+            const result = tracker.lookupProperty(doubleComputed)
+            expect(result).toEqual({
+                storeId: 'counter',
+                propName: 'double',
+                propType: 'getter',
+            })
+        })
+
+        it('should ignore non-reactive properties', () => {
+            const mockStore = {
+                $id: 'counter',
+                $state: { count: 0 },
+                increment: () => {},
+                staticValue: 42,
+            }
+
+            // Should not throw
+            tracker.registerStore(mockStore)
+        })
+
+        it('should handle stores without $id gracefully', () => {
+            const mockStore = {
+                $state: { count: 0 },
+            }
+
+            // Should not throw
+            tracker.registerStore(mockStore)
+        })
+    })
+
+    describe('lookupProperty', () => {
+        it('should return undefined for unregistered objects', () => {
+            const unknownRef = ref(0)
+            const result = tracker.lookupProperty(unknownRef)
+            expect(result).toBeUndefined()
+        })
+
+        it('should return undefined for null/undefined', () => {
+            expect(tracker.lookupProperty(null as any)).toBeUndefined()
+            expect(tracker.lookupProperty(undefined as any)).toBeUndefined()
+        })
+    })
+})
+
+describe('RenderRegistry with Pinia tracking', () => {
+    it('should enable Pinia tracking when option is set', () => {
+        const options: WhyDidYouRenderOptions = {
+            include: [],
+            exclude: [],
+            logLevel: 'warn',
+            logOnConsole: false,
+            enablePiniaTracking: true,
+        }
+        const registry = new RenderRegistry(options)
+
+        const piniaTracker = registry.getPiniaTracker()
+        expect(piniaTracker).not.toBeNull()
+    })
+
+    it('should not enable Pinia tracking when option is false', () => {
+        const options: WhyDidYouRenderOptions = {
+            include: [],
+            exclude: [],
+            logLevel: 'warn',
+            logOnConsole: false,
+            enablePiniaTracking: false,
+        }
+        const registry = new RenderRegistry(options)
+
+        const piniaTracker = registry.getPiniaTracker()
+        expect(piniaTracker).toBeNull()
+    })
+
+    it('should not enable Pinia tracking by default', () => {
+        const options: WhyDidYouRenderOptions = {
+            include: [],
+            exclude: [],
+            logLevel: 'warn',
+            logOnConsole: false,
+        }
+        const registry = new RenderRegistry(options)
+
+        const piniaTracker = registry.getPiniaTracker()
+        expect(piniaTracker).toBeNull()
     })
 })
