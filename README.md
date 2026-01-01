@@ -376,34 +376,9 @@ pnpm run dev
 
 ## Contributing
 
-Contributions are welcome! Please:
+Contributions are welcome! Please read our [Contributing Guide](CONTRIBUTING.md) for details on our development process, code style, and how to submit pull requests.
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Make your changes
-4. Run `pnpm run check` to ensure code quality
-5. Run `pnpm run test` to ensure tests pass
-6. Commit your changes using Commitizen:
-   ```bash
-   git add -A
-   pnpm commit
-   ```
-7. Push to the branch (`git push origin feature/amazing-feature`)
-8. Open a Pull Request
-
-### Committing Changes
-
-We use [Conventional Commits](https://www.conventionalcommits.org/) for all commits. [Commitizen](https://github.com/commitizen/cz-cli) helps build and enforce commit messages.
-
-```bash
-# Stage your changes
-git add -A
-
-# Use Commitizen to create your commit
-pnpm commit
-```
-
-This will trigger an interactive prompt to help compose your commit message.
+We use [Conventional Commits](https://www.conventionalcommits.org/) with [Commitizen](https://github.com/commitizen/cz-cli) - run `pnpm commit` to create commits.
 
 ## License
 
