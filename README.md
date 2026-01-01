@@ -1,6 +1,6 @@
 # vue-why-did-you-render 🔍
 
-[![Commitizen friendly](https://img.shields.io/badge/commitizen-friendly-brightgreen.svg)](http://commitizen.github.io/cz-cli/)
+[![npm](https://img.shields.io/npm/dt/vue-why-did-you-render.svg)](https://www.npmjs.com/package/vue-why-did-you-render) [![npm](https://img.shields.io/npm/v/vue-why-did-you-render.svg)](https://www.npmjs.com/package/vue-why-did-you-render) [![Commitizen friendly](https://img.shields.io/badge/commitizen-friendly-brightgreen.svg)](http://commitizen.github.io/cz-cli/)
 
 Debug Vue 3 render performance issues. See exactly why your components re-render.
 
